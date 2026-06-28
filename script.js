@@ -1,5 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getDatabase, ref, set, push, onValue, onChildAdded, off } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+// Добавляем auth
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDanduCPw3SYiYpSOpLUoGtgjVI3ftg0PQ",
@@ -14,14 +16,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const auth = getAuth(app); // Инициализация Auth
+const provider = new GoogleAuthProvider(); // Провайдер Google
 
-// Элементы интерфейса
-const regContainer = document.getElementById('regContainer'); 
-const regBtn = document.getElementById('reg'); // Кнопка с id="reg"
-const accountSelection = document.getElementById('accountSelection'); // Блок выбора аккаунтов (появляется по клику на reg)
-const agent1Btn = document.getElementById('agent1Btn'); // Кнопка Агент 1
-const agent2Btn = document.getElementById('agent2Btn'); // Кнопка Агент 2
-
+const regContainer = document.getElementById('regContainer');
+const regBtn = document.getElementById('reg');
 const radioSidebar = document.getElementById('radioSidebar');
 const toggleButton = document.getElementById('toggleButton');
 const chatContainer = document.getElementById('chatContainer');
@@ -31,44 +30,42 @@ const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const sendButton = document.getElementById('sendButton');
 
-let currentUserId = null;
+let currentUser = null; 
 let currentFreq1 = 0;
 let currentFreq2 = 0;
 let userRef = null;
 let activeUsersUnsubscribe = null;
 let messagesUnsubscribe = null;
 
-// 1. По клику на кнопку с id="reg" открываем выбор аккаунтов
-if (regBtn) {
-    regBtn.addEventListener('click', () => {
+// --- Логика входа ---
+regBtn.addEventListener('click', () => {
+    signInWithPopup(auth, provider).catch((error) => console.error(error));
+});
+
+// Отслеживание состояния входа
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        // Юзер вошел
+        currentUser = user.displayName || user.uid; // Используем имя или UID
         regContainer.style.display = 'none';
-        accountSelection.style.display = 'flex'; // Показываем выбор аккаунтов
-    });
-}
-
-// 2. Выбор конкретного профиля
-if (agent1Btn) {
-    agent1Btn.addEventListener('click', () => initializeProfile('Agent_1'));
-}
-if (agent2Btn) {
-    agent2Btn.addEventListener('click', () => initializeProfile('Agent_2'));
-}
-
-function initializeProfile(userId) {
-    currentUserId = userId;
-    accountSelection.style.display = 'none'; // Скрываем выбор
-    radioSidebar.classList.add('open'); // Открываем рацию
-    toggleButton.textContent = '<';
-    
-    userRef = ref(db, 'online_users/' + currentUserId);
-    setupRadio();
-}
+        radioSidebar.classList.add('open');
+        toggleButton.textContent = '<';
+        
+        userRef = ref(db, 'online_users/' + user.uid); // Используем UID для уникальности
+        setupRadio();
+    } else {
+        // Юзер вышел
+        regContainer.style.display = 'flex';
+        radioSidebar.classList.remove('open');
+    }
+});
 
 toggleButton.addEventListener('click', () => {
     radioSidebar.classList.toggle('open');
     toggleButton.textContent = radioSidebar.classList.contains('open') ? '<' : '>';
 });
 
+// --- Остальная логика (setupRadio, updateFrequencyOnServer, initChat) без изменений ---
 function setupRadio() {
     setupKnob(document.getElementById('knob1'), true);
     setupKnob(document.getElementById('knob2'), false);
@@ -112,10 +109,8 @@ function setupKnob(knobElement, isFirstFreq) {
 
     function applyRotation() {
         knobElement.style.transform = `translate(-50%, -50%) rotate(${currentValue * 30}deg)`;
-        
         if (isFirstFreq) currentFreq1 = currentValue;
         else currentFreq2 = currentValue;
-
         updateFrequencyOnServer();
     }
 }
@@ -123,11 +118,10 @@ function setupKnob(knobElement, isFirstFreq) {
 function updateFrequencyOnServer() {
     freq1Display.textContent = currentFreq1.toString().padStart(2, '0');
     freq2Display.textContent = currentFreq2.toString().padStart(2, '0');
-
     const combinedFreq = `${currentFreq1}:${currentFreq2}`;
 
     set(userRef, {
-        id: currentUserId,
+        name: currentUser,
         frequency: combinedFreq,
         lastActive: Date.now()
     });
@@ -138,15 +132,10 @@ function updateFrequencyOnServer() {
     activeUsersUnsubscribe = onValue(usersRef, (snapshot) => {
         const users = snapshot.val();
         if (!users) return;
-
         let usersOnSameFreq = 0;
-
         for (let userKey in users) {
-            if (users[userKey].frequency === combinedFreq) {
-                usersOnSameFreq++;
-            }
+            if (users[userKey].frequency === combinedFreq) usersOnSameFreq++;
         }
-
         if (usersOnSameFreq >= 2) {
             chatContainer.classList.remove('hidden');
             initChat(combinedFreq);
@@ -160,20 +149,14 @@ function updateFrequencyOnServer() {
 function initChat(freqChannel) {
     const safeChannelName = freqChannel.replace(/:/g, '_'); 
     const channelMessagesRef = ref(db, 'chat_rooms/' + safeChannelName);
-
     if (messagesUnsubscribe) off(channelMessagesRef); 
-
     chatMessages.innerHTML = ''; 
-
     sendButton.onclick = () => sendMessage(channelMessagesRef);
-    chatInput.onkeypress = (e) => {
-        if (e.key === 'Enter') sendMessage(channelMessagesRef);
-    };
-
+    chatInput.onkeypress = (e) => { if (e.key === 'Enter') sendMessage(channelMessagesRef); };
     messagesUnsubscribe = onChildAdded(channelMessagesRef, (snapshot) => {
         const data = snapshot.val();
         const messageDiv = document.createElement('div');
-        messageDiv.classList.add('message', data.sender === currentUserId ? 'sent' : 'received');
+        messageDiv.classList.add('message', data.sender === currentUser ? 'sent' : 'received');
         messageDiv.textContent = `${data.sender}: ${data.text}`;
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -185,7 +168,7 @@ function sendMessage(refPath) {
     if (text) {
         push(refPath, {
             text: text,
-            sender: currentUserId,
+            sender: currentUser,
             timestamp: Date.now()
         });
         chatInput.value = '';
