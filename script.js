@@ -4,7 +4,7 @@ import { getDatabase, ref, set, push, onValue, onChildAdded, off } from "https:/
 const firebaseConfig = {
     apiKey: "AIzaSyDanduCPw3SYiYpSOpLUoGtgjVI3ftg0PQ",
     authDomain: "testradeyka.firebaseapp.com",
-    databaseURL: "https://testradeyka-default-rtdb.europe-west1.firebasebasedatabase.app",
+    databaseURL: "https://testradeyka-default-rtdb.europe-west1.firebasedatabase.app",
     projectId: "testradeyka",
     storageBucket: "testradeyka.appspot.com",
     messagingSenderId: "727422013406",
@@ -17,8 +17,11 @@ const db = getDatabase(app);
 
 // Элементы интерфейса
 const regContainer = document.getElementById('regContainer'); 
-const regInput = document.getElementById('regInput'); // Поле для ввода ID
 const regBtn = document.getElementById('reg'); // Кнопка с id="reg"
+const accountSelection = document.getElementById('accountSelection'); // Блок выбора аккаунтов (появляется по клику на reg)
+const agent1Btn = document.getElementById('agent1Btn'); // Кнопка Агент 1
+const agent2Btn = document.getElementById('agent2Btn'); // Кнопка Агент 2
+
 const radioSidebar = document.getElementById('radioSidebar');
 const toggleButton = document.getElementById('toggleButton');
 const chatContainer = document.getElementById('chatContainer');
@@ -35,22 +38,31 @@ let userRef = null;
 let activeUsersUnsubscribe = null;
 let messagesUnsubscribe = null;
 
-// --- Регистрация по клику на кнопку с id="reg" ---
-regBtn.addEventListener('click', () => {
-    const enteredId = regInput.value.trim();
-    if (!enteredId) {
-        alert("Введите идентификатор (ID)");
-        return;
-    }
-    
-    currentUserId = enteredId;
-    regContainer.style.display = 'none'; 
-    radioSidebar.classList.add('open');
+// 1. По клику на кнопку с id="reg" открываем выбор аккаунтов
+if (regBtn) {
+    regBtn.addEventListener('click', () => {
+        regContainer.style.display = 'none';
+        accountSelection.style.display = 'flex'; // Показываем выбор аккаунтов
+    });
+}
+
+// 2. Выбор конкретного профиля
+if (agent1Btn) {
+    agent1Btn.addEventListener('click', () => initializeProfile('Agent_1'));
+}
+if (agent2Btn) {
+    agent2Btn.addEventListener('click', () => initializeProfile('Agent_2'));
+}
+
+function initializeProfile(userId) {
+    currentUserId = userId;
+    accountSelection.style.display = 'none'; // Скрываем выбор
+    radioSidebar.classList.add('open'); // Открываем рацию
     toggleButton.textContent = '<';
     
     userRef = ref(db, 'online_users/' + currentUserId);
     setupRadio();
-});
+}
 
 toggleButton.addEventListener('click', () => {
     radioSidebar.classList.toggle('open');
