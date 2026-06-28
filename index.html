@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Radio Chat</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="main-container">
+        <div class="chat-container hidden" id="chatContainer">
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input-wrapper">
+                <input type="text" id="chatInput" placeholder="Введите сообщение...">
+                <button id="sendButton">Send</button>
+            </div>
+        </div>
+
+        <div class="radio-sidebar" id="radioSidebar">
+            <button class="toggle-button" id="toggleButton">></button>
+            <div class="radio-wrapper">
+                <img src="Untitled320_20260628210932.png" alt="Radio" class="radio-bg">
+                
+                <div class="radio-screen">
+                    <span id="freq1">00</span> : <span id="freq2">00</span>
+                </div>
+                
+                <img src="Untitled319_20260628204131.png" alt="Knob 1" class="knob" id="knob1">
+                <img src="Untitled319_20260628204131.png" alt="Knob 2" class="knob" id="knob2">
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>
