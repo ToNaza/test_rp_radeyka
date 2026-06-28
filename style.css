@@ -169,3 +169,12 @@ body {
 .knob:active {
     cursor: grabbing;
 }
+
+.reg-input {
+    padding: 12px;
+    font-size: 16px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    width: 250px;
+    outline: none;
+}

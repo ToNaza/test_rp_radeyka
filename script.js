@@ -4,7 +4,7 @@ import { getDatabase, ref, set, push, onValue, onChildAdded, off } from "https:/
 const firebaseConfig = {
     apiKey: "AIzaSyDanduCPw3SYiYpSOpLUoGtgjVI3ftg0PQ",
     authDomain: "testradeyka.firebaseapp.com",
-    databaseURL: "https://testradeyka-default-rtdb.europe-west1.firebasedatabase.app",
+    databaseURL: "https://testradeyka-default-rtdb.europe-west1.firebasebasedatabase.app",
     projectId: "testradeyka",
     storageBucket: "testradeyka.appspot.com",
     messagingSenderId: "727422013406",
@@ -16,9 +16,9 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // Элементы интерфейса
-const regContainer = document.getElementById('regContainer'); // Блок регистрации
-const user1Btn = document.getElementById('user1Btn');
-const user2Btn = document.getElementById('user2Btn');
+const regContainer = document.getElementById('regContainer'); 
+const regInput = document.getElementById('regInput'); // Поле для ввода ID
+const regBtn = document.getElementById('reg'); // Кнопка с id="reg"
 const radioSidebar = document.getElementById('radioSidebar');
 const toggleButton = document.getElementById('toggleButton');
 const chatContainer = document.getElementById('chatContainer');
@@ -28,29 +28,29 @@ const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const sendButton = document.getElementById('sendButton');
 
-let currentUser = null;
+let currentUserId = null;
 let currentFreq1 = 0;
 let currentFreq2 = 0;
 let userRef = null;
 let activeUsersUnsubscribe = null;
 let messagesUnsubscribe = null;
 
-// --- Регистрация (выбор аккаунта) ---
-user1Btn.addEventListener('click', () => selectUser('Agent_1'));
-user2Btn.addEventListener('click', () => selectUser('Agent_2'));
-
-function selectUser(userName) {
-    currentUser = userName;
-    regContainer.style.display = 'none'; // Скрываем выбор, открываем рацию
+// --- Регистрация по клику на кнопку с id="reg" ---
+regBtn.addEventListener('click', () => {
+    const enteredId = regInput.value.trim();
+    if (!enteredId) {
+        alert("Введите идентификатор (ID)");
+        return;
+    }
+    
+    currentUserId = enteredId;
+    regContainer.style.display = 'none'; 
     radioSidebar.classList.add('open');
     toggleButton.textContent = '<';
     
-    // Ссылка в базе для текущего юзера
-    userRef = ref(db, 'online_users/' + currentUser);
-    
-    // Запуск логики рации после авторизации
+    userRef = ref(db, 'online_users/' + currentUserId);
     setupRadio();
-}
+});
 
 toggleButton.addEventListener('click', () => {
     radioSidebar.classList.toggle('open');
@@ -108,23 +108,19 @@ function setupKnob(knobElement, isFirstFreq) {
     }
 }
 
-// --- Отправка частоты на сервер ---
 function updateFrequencyOnServer() {
     freq1Display.textContent = currentFreq1.toString().padStart(2, '0');
     freq2Display.textContent = currentFreq2.toString().padStart(2, '0');
 
-    // Формируем общую частоту как строку, например "3:10"
     const combinedFreq = `${currentFreq1}:${currentFreq2}`;
 
-    // Обновляем состояние текущего пользователя в реальном времени
     set(userRef, {
-        name: currentUser,
+        id: currentUserId,
         frequency: combinedFreq,
         lastActive: Date.now()
     });
 
-    // Слушаем, сколько всего пользователей настроены на ЭТУ ЖЕ частоту
-    if (activeUsersUnsubscribe) activeUsersUnsubscribe(); // Отключаем старого слушателя
+    if (activeUsersUnsubscribe) activeUsersUnsubscribe(); 
     
     const usersRef = ref(db, 'online_users');
     activeUsersUnsubscribe = onValue(usersRef, (snapshot) => {
@@ -139,25 +135,23 @@ function updateFrequencyOnServer() {
             }
         }
 
-        // Если 2 или более пользователей на одной волне, открываем чат
         if (usersOnSameFreq >= 2) {
             chatContainer.classList.remove('hidden');
             initChat(combinedFreq);
         } else {
             chatContainer.classList.add('hidden');
-            if (messagesUnsubscribe) messagesUnsubscribe(); // Отключаем чат, если частоту сбили
+            if (messagesUnsubscribe) messagesUnsubscribe(); 
         }
     });
 }
 
-// --- Логика чата ---
 function initChat(freqChannel) {
-    const safeChannelName = freqChannel.replace(/:/g, '_'); // Название ветки чата (символ двоеточия запрещен в путях Firebase)
+    const safeChannelName = freqChannel.replace(/:/g, '_'); 
     const channelMessagesRef = ref(db, 'chat_rooms/' + safeChannelName);
 
-    if (messagesUnsubscribe) off(channelMessagesRef); // Снимаем предыдущие подписки
+    if (messagesUnsubscribe) off(channelMessagesRef); 
 
-    chatMessages.innerHTML = ''; // Очищаем историю при переключении канала
+    chatMessages.innerHTML = ''; 
 
     sendButton.onclick = () => sendMessage(channelMessagesRef);
     chatInput.onkeypress = (e) => {
@@ -167,7 +161,7 @@ function initChat(freqChannel) {
     messagesUnsubscribe = onChildAdded(channelMessagesRef, (snapshot) => {
         const data = snapshot.val();
         const messageDiv = document.createElement('div');
-        messageDiv.classList.add('message', data.sender === currentUser ? 'sent' : 'received');
+        messageDiv.classList.add('message', data.sender === currentUserId ? 'sent' : 'received');
         messageDiv.textContent = `${data.sender}: ${data.text}`;
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -179,7 +173,7 @@ function sendMessage(refPath) {
     if (text) {
         push(refPath, {
             text: text,
-            sender: currentUser,
+            sender: currentUserId,
             timestamp: Date.now()
         });
         chatInput.value = '';
