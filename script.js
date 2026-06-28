@@ -2,13 +2,14 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebas
 import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDanduCPw3SYiYpSOPloUQgtjYI3ftg0PQ",
-  authDomain: "testradeyka.firebaseapp.com",
-  projectId: "testradeyka",
-  storageBucket: "testradeyka.firebasestorage.app",
-  messagingSenderId: "727422013406",
-  appId: "1:727422013406:web:2c1dbdedbb2bceecffd74f",
-  measurementId: "G-MCVDS5V931"
+    apiKey: "AIzaSyDanduCPw3SYiYpSOpLUoGtgjVI3ftg0PQ",
+    authDomain: "testradeyka.firebaseapp.com",
+    databaseURL: "https://testradeyka-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "testradeyka",
+    storageBucket: "testradeyka.appspot.com",
+    messagingSenderId: "727422013406",
+    appId: "1:727422013406:web:2c1dbdedbb2bceeffd74f",
+    measurementId: "G-MCVDS9V931"
 };
 
 const app = initializeApp(firebaseConfig);
