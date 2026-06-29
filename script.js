@@ -1,176 +1,238 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getDatabase, ref, set, push, onValue, onChildAdded, off } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
-// Добавляем auth
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getDatabase, ref, set, onValue, push, remove, off } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDanduCPw3SYiYpSOpLUoGtgjVI3ftg0PQ",
-    authDomain: "testradeyka.firebaseapp.com",
-    databaseURL: "https://testradeyka-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "testradeyka",
-    storageBucket: "testradeyka.appspot.com",
-    messagingSenderId: "727422013406",
-    appId: "1:727422013406:web:2c1dbdedbb2bceeffd74f",
-    measurementId: "G-MCVDS9V931"
+  apiKey: "AIzaSyCZt2HX_Mhuv842QqNPwDh-KGNChIPz_NM",
+  authDomain: "test-radeyka-rp.firebaseapp.com",
+  projectId: "test-radeyka-rp",
+  storageBucket: "test-radeyka-rp.firebasestorage.app",
+  messagingSenderId: "249575852311",
+  appId: "1:249575852311:web:0053da73f552d110d80f52",
+  measurementId: "G-R3RL0PGS6T"
 };
 
+const analytics = getAnalytics(app);
+// Инициализация
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getDatabase(app);
-const auth = getAuth(app); // Инициализация Auth
-const provider = new GoogleAuthProvider(); // Провайдер Google
+const provider = new GoogleAuthProvider();
 
-const regContainer = document.getElementById('regContainer');
+// DOM элементы
 const regBtn = document.getElementById('reg');
-const radioSidebar = document.getElementById('radioSidebar');
-const toggleButton = document.getElementById('toggleButton');
+const regContainer = document.getElementById('regContainer');
 const chatContainer = document.getElementById('chatContainer');
-const freq1Display = document.getElementById('freq1');
-const freq2Display = document.getElementById('freq2');
 const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const sendButton = document.getElementById('sendButton');
+const toggleButton = document.getElementById('toggleButton');
+const radioSidebar = document.getElementById('radioSidebar');
+const freq1Display = document.getElementById('freq1');
+const freq2Display = document.getElementById('freq2');
+const knob1 = document.getElementById('knob1');
+const knob2 = document.getElementById('knob2');
 
-let currentUser = null; 
-let currentFreq1 = 0;
-let currentFreq2 = 0;
-let userRef = null;
-let activeUsersUnsubscribe = null;
-let messagesUnsubscribe = null;
+// Состояние
+let currentUser = null;
+let freq1 = 0;
+let freq2 = 0;
+let currentFrequencyKey = null;
+let chatRef = null;
 
-// --- Логика входа ---
+// --- 1. АВТОРИЗАЦИЯ VIA GOOGLE ---
 regBtn.addEventListener('click', () => {
-    signInWithPopup(auth, provider).catch((error) => console.error(error));
+    signInWithPopup(auth, provider).catch(err => console.error("Ошибка входа:", err));
 });
 
-// Отслеживание состояния входа
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        // Юзер вошел
-        currentUser = user.displayName || user.uid; // Используем имя или UID
+        currentUser = user;
+        regContainer.classList.add('hidden'); // Скрываем кнопку входа (добавь .hidden {display:none} в CSS если нет)
         regContainer.style.display = 'none';
-        radioSidebar.classList.add('open');
-        toggleButton.textContent = '<';
-        
-        userRef = ref(db, 'online_users/' + user.uid); // Используем UID для уникальности
-        setupRadio();
+        updateUserPresence();
     } else {
-        // Юзер вышел
+        currentUser = null;
         regContainer.style.display = 'flex';
-        radioSidebar.classList.remove('open');
+        disconnectFromFrequency();
     }
 });
 
+// --- 2. СИДЕНЬЕ (РАЦИЯ) ---
 toggleButton.addEventListener('click', () => {
     radioSidebar.classList.toggle('open');
-    toggleButton.textContent = radioSidebar.classList.contains('open') ? '<' : '>';
+    toggleButton.innerText = radioSidebar.classList.contains('open') ? '<' : '>';
 });
 
-// --- Остальная логика (setupRadio, updateFrequencyOnServer, initChat) без изменений ---
-function setupRadio() {
-    setupKnob(document.getElementById('knob1'), true);
-    setupKnob(document.getElementById('knob2'), false);
-}
-
-function setupKnob(knobElement, isFirstFreq) {
-    let currentValue = 0;
-    let isPressed = false;
-
-    knobElement.addEventListener('mousedown', (e) => { isPressed = true; e.preventDefault(); });
-    window.addEventListener('mouseup', () => { isPressed = false; });
-
-    window.addEventListener('wheel', (e) => {
-        if (!isPressed) return;
-        e.preventDefault();
-        const delta = Math.sign(e.deltaY);
-        if (delta > 0 && currentValue > 0) currentValue--;
-        else if (delta < 0 && currentValue < 12) currentValue++;
-        applyRotation();
-    }, { passive: false });
-
+// --- 3. ВРАЩЕНИЕ КРУТИЛОК ---
+function setupKnob(knobElement, isUpperKnob) {
+    let angle = 0; 
     let startY = 0;
-    knobElement.addEventListener('touchstart', (e) => {
-        isPressed = true;
-        startY = e.touches[0].clientY;
-    }, { passive: true });
+    let isDragging = false;
 
-    window.addEventListener('touchend', () => { isPressed = false; });
+    // Лимиты: от 0 до 12 (всего 13 положений: 0, 1, 2... 12)
+    const maxVal = 12;
 
-    window.addEventListener('touchmove', (e) => {
-        if (!isPressed) return;
-        let currentY = e.touches[0].clientY;
-        let deltaY = startY - currentY;
-        if (Math.abs(deltaY) > 15) {
-            if (deltaY > 0 && currentValue < 12) currentValue++;
-            else if (deltaY < 0 && currentValue > 0) currentValue--;
-            startY = currentY;
-            applyRotation();
-        }
-    }, { passive: true });
+    function updateValue(delta) {
+        let currentVal = isUpperKnob ? freq1 : freq2;
+        currentVal += delta;
+        if (currentVal < 0) currentVal = 0;
+        if (currentVal > maxVal) currentVal = maxVal;
 
-    function applyRotation() {
-        knobElement.style.transform = `translate(-50%, -50%) rotate(${currentValue * 30}deg)`;
-        if (isFirstFreq) currentFreq1 = currentValue;
-        else currentFreq2 = currentValue;
-        updateFrequencyOnServer();
+        if (isUpperKnob) freq1 = currentVal;
+        else freq2 = currentVal;
+
+        // Визуальное вращение: делим 360 градусов на 12 секторов
+        angle = currentVal * (360 / maxVal);
+        knobElement.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+
+        // Обновление цифр на табло (с ведущим нулем)
+        if (isUpperKnob) freq1Display.innerText = String(freq1).padStart(2, '0');
+        else freq2Display.innerText = String(freq2).padStart(2, '0');
+
+        // Обработка логики частоты
+        updateUserPresence();
     }
-}
 
-function updateFrequencyOnServer() {
-    freq1Display.textContent = currentFreq1.toString().padStart(2, '0');
-    freq2Display.textContent = currentFreq2.toString().padStart(2, '0');
-    const combinedFreq = `${currentFreq1}:${currentFreq2}`;
-
-    set(userRef, {
-        name: currentUser,
-        frequency: combinedFreq,
-        lastActive: Date.now()
+    // ПК: Колёсико мыши при наведении ИЛИ зажатии
+    knobElement.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 1 : -1;
+        updateValue(delta);
     });
 
-    if (activeUsersUnsubscribe) activeUsersUnsubscribe(); 
-    
-    const usersRef = ref(db, 'online_users');
-    activeUsersUnsubscribe = onValue(usersRef, (snapshot) => {
-        const users = snapshot.val();
-        if (!users) return;
-        let usersOnSameFreq = 0;
-        for (let userKey in users) {
-            if (users[userKey].frequency === combinedFreq) usersOnSameFreq++;
+    // Смартфон / Мышь: Зажатие и Перетаскивание вверх/вниз
+    const startDrag = (e) => {
+        isDragging = true;
+        startY = e.touches ? e.touches[0].clientY : e.clientY;
+    };
+
+    const doDrag = (e) => {
+        if (!isDragging) return;
+        const currentY = e.touches ? e.touches[0].clientY : e.clientY;
+        const diffY = startY - currentY; // Вверх — положительное значение
+
+        // Чувствительность свайпа: каждые 20 пикселей меняют значение
+        if (Math.abs(diffY) > 20) {
+            const delta = diffY > 0 ? 1 : -1;
+            updateValue(delta);
+            startY = currentY; 
         }
-        if (usersOnSameFreq >= 2) {
+    };
+
+    const stopDrag = () => { isDragging = false; };
+
+    knobElement.addEventListener('mousedown', startDrag);
+    window.addEventListener('mousemove', doDrag);
+    window.addEventListener('mouseup', stopDrag);
+
+    knobElement.addEventListener('touchstart', startDrag, { passive: true });
+    window.addEventListener('touchmove', doDrag, { passive: false });
+    window.addEventListener('touchend', stopDrag);
+}
+
+setupKnob(knob1, true);
+setupKnob(knob2, false);
+
+// --- 4. РАБОТА С СЕТЬЮ И ЧАСТОТАМИ ---
+function updateUserPresence() {
+    if (!currentUser) return;
+
+    // Отключаемся от старой частоты
+    disconnectFromFrequency();
+
+    // Если частота 00:00 — рация выключена
+    if (freq1 === 0 && freq2 === 0) {
+        chatContainer.classList.add('hidden');
+        return;
+    }
+
+    currentFrequencyKey = `${String(freq1).padStart(2,'0')}_${String(freq2).padStart(2,'0')}`;
+    
+    // Регистрируем пользователя на этой частоте
+    const presenceRef = ref(db, `frequencies/${currentFrequencyKey}/users/${currentUser.uid}`);
+    set(presenceRef, {
+        name: currentUser.displayName,
+        connectedAt: Date.now()
+    });
+
+    // Слушаем количество людей на частоте и сообщения
+    const usersCountRef = ref(db, `frequencies/${currentFrequencyKey}/users`);
+    onValue(usersCountRef, (snapshot) => {
+        const users = snapshot.val();
+        if (users && Object.keys(users).length >= 2) {
             chatContainer.classList.remove('hidden');
-            initChat(combinedFreq);
+            listenToChat();
         } else {
             chatContainer.classList.add('hidden');
-            if (messagesUnsubscribe) messagesUnsubscribe(); 
+            // Если мы остались одни на частоте, очищаем ветку сообщений в БД, чтобы в следующий раз чат был чист
+            if (chatRef) {
+                const messagesRef = ref(db, `frequencies/${currentFrequencyKey}/messages`);
+                remove(messagesRef);
+                off(messagesRef);
+                chatRef = null;
+            }
+        }
+    });
+
+    // Удаление из БД при закрытии вкладки браузера
+    presenceRef.onDisconnect().remove();
+}
+
+function disconnectFromFrequency() {
+    if (currentFrequencyKey && currentUser) {
+        const presenceRef = ref(db, `frequencies/${currentFrequencyKey}/users/${currentUser.uid}`);
+        remove(presenceRef);
+        
+        const usersCountRef = ref(db, `frequencies/${currentFrequencyKey}/users`);
+        off(usersCountRef);
+        
+        if (chatRef) {
+            off(chatRef);
+            chatRef = null;
+        }
+    }
+    chatMessages.innerHTML = '';
+}
+
+function listenToChat() {
+    if (chatRef) return; // Чтобы не вешать дублирующие слушатели
+
+    chatRef = ref(db, `frequencies/${currentFrequencyKey}/messages`);
+    onValue(chatRef, (snapshot) => {
+        chatMessages.innerHTML = '';
+        const data = snapshot.val();
+        if (data) {
+            Object.values(data).forEach(msg => {
+                const msgDiv = document.createElement('div');
+                msgDiv.classList.add('message');
+                msgDiv.classList.add(msg.senderId === currentUser.uid ? 'sent' : 'received');
+                msgDiv.innerText = `${msg.senderName}: ${msg.text}`;
+                chatMessages.appendChild(msgDiv);
+            });
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
     });
 }
 
-function initChat(freqChannel) {
-    const safeChannelName = freqChannel.replace(/:/g, '_'); 
-    const channelMessagesRef = ref(db, 'chat_rooms/' + safeChannelName);
-    if (messagesUnsubscribe) off(channelMessagesRef); 
-    chatMessages.innerHTML = ''; 
-    sendButton.onclick = () => sendMessage(channelMessagesRef);
-    chatInput.onkeypress = (e) => { if (e.key === 'Enter') sendMessage(channelMessagesRef); };
-    messagesUnsubscribe = onChildAdded(channelMessagesRef, (snapshot) => {
-        const data = snapshot.val();
-        const messageDiv = document.createElement('div');
-        messageDiv.classList.add('message', data.sender === currentUser ? 'sent' : 'received');
-        messageDiv.textContent = `${data.sender}: ${data.text}`;
-        chatMessages.appendChild(messageDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+// --- 5. ОТПРАВКА СООБЩЕНИЙ ---
+function sendMessage() {
+    const text = chatInput.value.trim();
+    if (!text || !currentFrequencyKey) return;
+
+    const messagesRef = ref(db, `frequencies/${currentFrequencyKey}/messages`);
+    push(messagesRef, {
+        senderId: currentUser.uid,
+        senderName: currentUser.displayName,
+        text: text,
+        timestamp: Date.now()
     });
+    chatInput.value = '';
 }
 
-function sendMessage(refPath) {
-    const text = chatInput.value.trim();
-    if (text) {
-        push(refPath, {
-            text: text,
-            sender: currentUser,
-            timestamp: Date.now()
-        });
-        chatInput.value = '';
-    }
-}
+sendButton.addEventListener('click', sendMessage);
+chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+});

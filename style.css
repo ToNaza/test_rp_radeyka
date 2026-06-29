@@ -178,3 +178,7 @@ body {
     width: 250px;
     outline: none;
 }
+
+.reg-container.hidden {
+    display: none !important;
+}
