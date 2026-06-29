@@ -6,14 +6,13 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCZt2HX_Mhuv842QqNPwDh-KGNChIPz_NM",
-  authDomain: "test-radeyka-rp.firebaseapp.com",
-  databaseURL: "https://test-radeyka-rp-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "test-radeyka-rp",
-  storageBucket: "test-radeyka-rp.firebasestorage.app",
-  messagingSenderId: "249575852311",
-  appId: "1:249575852311:web:9ba691ffb8c13371d80f52",
-  measurementId: "G-4D3V17J1HV"
+    apiKey: "AIzaSyCqYzKEVWops5qTt1Iw_qvm6b42VhuFgaA", 
+    authDomain: "test-radeyka-rp.firebaseapp.com",
+    databaseURL: "https://test-radeyka-rp-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "test-radeyka-rp",
+    storageBucket: "test-radeyka-rp.firebasestorage.app",
+    messagingSenderId: "249575852311",
+    appId: "1:249575852311:web:0053da73f552d110d80f52"
 };
 
 const analytics = getAnalytics(app);
