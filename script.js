@@ -1,20 +1,17 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getDatabase, ref, set, onValue, push, remove, off } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCZt2HX_Mhuv842QqNPwDh-KGNChIPz_NM",
-  authDomain: "test-radeyka-rp.firebaseapp.com",
-  projectId: "test-radeyka-rp",
-  storageBucket: "test-radeyka-rp.firebasestorage.app",
-  messagingSenderId: "249575852311",
-  appId: "1:249575852311:web:0053da73f552d110d80f52",
-  measurementId: "G-R3RL0PGS6T"
+    apiKey: "AIzaSyCzt2HX_Mhuv842QqNPwDh-KGnCHIPz_NM",
+    authDomain: "test-radeyka-rp.firebaseapp.com",
+    databaseURL: "https://test-radeyka-rp-default-rtdb.europe-west1.firebasedatabase.app/",
+    projectId: "test-radeyka-rp",
+    storageBucket: "test-radeyka-rp.firebasestorage.app",
+    messagingSenderId: "249575852311",
+    appId: "1:249575852311:web:0053da73f552d110d80f52"
 };
 
-const analytics = getAnalytics(app);
 // Инициализация
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
