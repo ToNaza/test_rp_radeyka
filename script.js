@@ -15,10 +15,14 @@ const firebaseConfig = {
     appId: "1:249575852311:web:0053da73f552d110d80f52"
 };
 
-const analytics = getAnalytics(app);
-
-// Инициализация
+// Инициализация приложения и авторизации
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+// ВАЖНО: Передаем URL базы данных напрямую в функцию getDatabase
+const db = getDatabase(app, firebaseConfig.databaseURL); 
+
+const provider = new GoogleAuthProvider();
 const auth = getAuth(app);
 const db = getDatabase(app);
 const provider = new GoogleAuthProvider();
